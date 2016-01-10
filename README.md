@@ -48,4 +48,4 @@
 
 12. **vpc-elasticache-template.json**
 
-  * Creates a VPC with four subnets in two availability zones. Calls the <i>elasticache-template.json</i> nested stack.
+  * Creates a VPC with four subnets in two availability zones. Calls the *elasticache-template.json* nested stack.
