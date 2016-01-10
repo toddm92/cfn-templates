@@ -1,5 +1,7 @@
 ### AWS CloudFormation Templates
 
+![CloudFormation Logo](./images/cfn.jpg)
+
 1. **autoscale-healthyhost-template.json**
 
   * CloudWatch and AutoScaling work together to monitor ELB/instances and maintain the total number of desired instances in the pool.
