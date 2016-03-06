@@ -38,16 +38,20 @@
 
   * Create a S3 logging bucket, bucket policy and retension policy in the region the stack is launched in.
 
-10. **vpc-2az-template.json**
+10. **vpc-2az-natgw-template.json**
 
-  * VPC Architecture template. Creates a VPC in 2 availability-zones, 4-6 subnets (optional Db subnet tier).
+  * Creates a VPC with AWS NAT Gateways in 2 availability-zones, 4-6 subnets (optional Db subnet tier).
+
+11. **vpc-2az-template.json**
+
+  * Creates a VPC with Managed NAT instances in 2 availability-zones, 4-6 subnets (optional Db subnet tier).
   * https://s3-us-west-2.amazonaws.com/toddm92/public/diagrams/vpc-2az-diagram.jpg
 
-11. **vpc-beanstalk-template.json**
+12. **vpc-beanstalk-template.json**
 
   * Creates a VPC with four subnets in two availability zones. Launches an Elastic Beanstalk environment.
   * https://s3-us-west-2.amazonaws.com/toddm92/public/diagrams/vpc-beanstalk-env.jpg
 
-12. **vpc-elasticache-template.json**
+13. **vpc-elasticache-template.json**
 
   * Creates a VPC with four subnets in two availability zones. Calls the *elasticache-template.json* nested stack.
