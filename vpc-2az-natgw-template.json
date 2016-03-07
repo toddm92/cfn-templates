@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
-  "Description"	: "VPC Architecture template. Creates a VPC with NAT Gateways in 2 availability-zones, 4-6 subnets (optional Db subnet tier).",
+  "Description"	: Creates a VPC with AWS NAT Gateways in 2 availability-zones, 4-6 subnets (optional Db subnet tier).",
 
   "Metadata" : {
     "AWS::CloudFormation::Interface" : {
