@@ -1,82 +1,119 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
-  "Description"	: Creates a VPC with Managed NAT instances in 2 availability-zones, 4-6 subnets (optional Db subnet tier).",
+  "Description"	: "Creates a VPC with Managed NAT instances in 2 availability-zones, 4-6 subnets (optional Db subnet tier).",
+
+  "Metadata" : {
+    "AWS::CloudFormation::Interface" : {
+    "ParameterGroups" : [
+      {
+        "Label"                         : { "default" : "Network Configuration" },
+        "Parameters"                    : [ "VPCCIDRBlock", "PublicSubnetAZ1", "PublicSubnetAZ2", "PrivateSubnetAZ1", "PrivateSubnetAZ2" ]
+      },
+      {
+        "Label"                         : { "default" : "Database Subnet Option" },
+        "Parameters"                    : [ "PrivateDBSubnetAZ1", "PrivateDBSubnetAZ2" ]
+      },
+      {
+        "Label"                         : { "default" : "Tagging" },
+        "Parameters"                    : [ "OwnerService", "StackEnv" ]
+      },
+      {
+        "Label"                         : { "default" : "NAT Instance Setup" },
+        "Parameters"                    : [ "InstanceType", "UserKeys", "SSHFrom" ]
+      }
+    ],
+    "ParameterLabels" : {
+        "VPCCIDRBlock"                  : { "default" : "CIDR block for the VPC" },
+        "PublicSubnetAZ1"               : { "default" : "Public subnet for AZ1" },
+        "PublicSubnetAZ2"               : { "default" : "Public subnet for AZ2" },
+        "PrivateSubnetAZ1"              : { "default" : "Private subnet for AZ1" },
+        "PrivateSubnetAZ2"              : { "default" : "Private subnet for AZ2" },
+        "PrivateDBSubnetAZ1"            : { "default" : "Database subnet for AZ1" },
+        "PrivateDBSubnetAZ2"            : { "default" : "Database subnet for AZ2" },
+        "OwnerService"                  : { "default" : "Service name" },
+        "StackEnv"                      : { "default" : "Environment name" },
+        "InstanceType "                 : { "default" : "Instance type" },
+        "UserKeys"                      : { "default" : "PEM keys" },
+        "SSHFrom"                       : { "default" : "SSH access from IP/CIDR" }
+      }
+    }
+  },
 
   "Parameters" : {
-    "aVPCCIDRBlock" : {
+    "VPCCIDRBlock" : {
         "Type"				: "String",
         "Default"			: "10.79.0.0/23",
         "Description"			: "Enter your VPC IP CIDR block.",
         "AllowedPattern"		: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
         "ConstraintDescription"		: "Please enter a valid IP CIDR range of the form x.x.x.x/x."
     },
-    "bPublicSubnetAZ1" : {
+    "PublicSubnetAZ1" : {
         "Type"				: "String",
         "Default"			: "10.79.0.0/26",
         "Description"			: "IP space for Public subnet in availability zone-1.",
         "AllowedPattern"		: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
         "ConstraintDescription"		: "Please enter a valid IP CIDR range of the form x.x.x.x/x."
     },
-    "cPublicSubnetAZ2" : {
+    "PublicSubnetAZ2" : {
         "Type"				: "String",
         "Default"			: "10.79.0.64/26",
         "Description"			: "IP space for Public subnet in availability zone-2.",
         "AllowedPattern"		: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
         "ConstraintDescription"		: "Please enter a valid IP CIDR range of the form x.x.x.x/x."
     },
-    "dPrivateSubnetAZ1" : {
+    "PrivateSubnetAZ1" : {
         "Type"				: "String",
         "Default"			: "10.79.1.0/25",
         "Description"			: "IP space for Private subnet in availability zone-1.",
         "AllowedPattern"		: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
         "ConstraintDescription"		: "Please enter a valid IP CIDR range of the form x.x.x.x/x."
     },
-    "ePrivateSubnetAZ2" : {
+    "PrivateSubnetAZ2" : {
         "Type"				: "String",
         "Default"			: "10.79.1.128/25",
         "Description"			: "IP space for Private subnet in availability zone-2.",
         "AllowedPattern"		: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
         "ConstraintDescription"		: "Please enter a valid IP CIDR range of the form x.x.x.x/x."
     },
-    "fPrivateDBSubnetAZ1" : {
+    "PrivateDBSubnetAZ1" : {
         "Type"				: "String",
         "Default"			: "na",
         "Description"			: "(Optional) IP space for Private/DB subnet in availability zone-1. (Enter 'na' if not desired)",
         "AllowedPattern"		: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})|na",
         "ConstraintDescription"		: "Please enter a valid IP CIDR range of the form x.x.x.x/x or 'na'."
     },
-    "gPrivateDBSubnetAZ2" : {
+    "PrivateDBSubnetAZ2" : {
         "Type"				: "String",
         "Default"			: "na",
         "Description"			: "(Optional) IP space for Private/DB subnet for availability zone-2. (Enter 'na' if not desired)",
         "AllowedPattern"		: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})|na",
         "ConstraintDescription"		: "Please enter a valid IP CIDR range of the form x.x.x.x/x or 'na'."
     },
-    "hInstanceType" : {
+    "InstanceType" : {
         "Type"                          : "String",
         "Default"                       : "c3.2xlarge",
         "AllowedValues"                 : [ "t2.small","t2.medium","m4.large","m4.xlarge","m4.2xlarge","c4.large","c4.xlarge","c4.2xlarge","c4.4xlarge","c4.8xlarge","c3.large","c3.xlarge","c3.2xlarge","c3.4xlarge","c3.8xlarge","r3.large","r3.xlarge","r3.2xlarge","r3.4xlarge","r3.8xlarge","i2.xlarge","i2.2xlarge","i2.4xlarge","i2.8xlarge" ],
         "Description"                   : "NAT instance size. Note: For enhanced networking, choose a c4, c3, r3 or i2 class instance."
     },
-    "iUserKeys" : {
+    "UserKeys" : {
         "Type"                          : "AWS::EC2::KeyPair::KeyName",
         "Description"                   : "NAT instance SSH PEM key name."
     },
-    "jSSHFrom" : {
+    "SSHFrom" : {
         "Type"                          : "String",
         "Default"                       : "10.10.10.0/24",
         "Description"                   : "SSH access to the public subnets.  Used to update the network access control list.",
         "AllowedPattern"                : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
         "ConstraintDescription"         : "Please enter a valid CIDR range of the form x.x.x.x/x."
     },
-    "kOwnerService" : {
+    "OwnerService" : {
         "Type"				: "String",
         "Default"			: "cloudteam",
         "Description"			: "Owner or service name. (For tagging, use lowercase, no spaces, dashes ok.)",
         "AllowedPattern"		: "[-a-z0-9]*",
         "ConstraintDescription"		: "Must be lowercase, no spaces, dashes ok."
     },
-    "lStackEnv" : {
+    "StackEnv" : {
         "Type"				: "String",
         "Default"			: "stage",
         "Description"			: "Environment name; prod, stage, dev, etc. (For tagging, use lowercase, no spaces, dashes ok.)",
@@ -88,10 +125,10 @@
   "Conditions" : {
 
     "PriDBSubAZ1" : {
-        "Fn::Not" : [ { "Fn::Equals" : [ { "Ref" : "fPrivateDBSubnetAZ1" }, "na" ] } ]
+        "Fn::Not" : [ { "Fn::Equals" : [ { "Ref" : "PrivateDBSubnetAZ1" }, "na" ] } ]
     },
     "PriDBSubAZ2" : {
-        "Fn::Not" : [ { "Fn::Equals" : [ { "Ref" : "gPrivateDBSubnetAZ2" }, "na" ] } ]
+        "Fn::Not" : [ { "Fn::Equals" : [ { "Ref" : "PrivateDBSubnetAZ2" }, "na" ] } ]
     },
     "AnyPriDBSub" : {
         "Fn::Or" : [ { "Condition" : "PriDBSubAZ1" }, { "Condition" : "PriDBSubAZ2" } ]
@@ -117,7 +154,7 @@
     "ec2VPC" : {
       "Type" : "AWS::EC2::VPC",
         "Properties" : {
-          "CidrBlock"			: { "Ref" : "aVPCCIDRBlock" },
+          "CidrBlock"			: { "Ref" : "VPCCIDRBlock" },
           "EnableDnsSupport"		: "true",
           "EnableDnsHostnames"		: "true",
           "InstanceTenancy"		: "default",
@@ -132,8 +169,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "vpc",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -158,8 +195,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "igw",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -182,7 +219,7 @@
       "Type" : "AWS::EC2::Subnet",
         "Properties" : {
           "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Ref" : "bPublicSubnetAZ1" },
+          "CidrBlock"			: { "Ref" : "PublicSubnetAZ1" },
           "AvailabilityZone" : { 
             "Fn::Select"		: [ "0", { "Fn::GetAZs": "" } ]
           },
@@ -197,8 +234,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "public-az1",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -212,7 +249,7 @@
       "Type" : "AWS::EC2::Subnet",
         "Properties" : {
           "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Ref" : "cPublicSubnetAZ2" },
+          "CidrBlock"			: { "Ref" : "PublicSubnetAZ2" },
           "AvailabilityZone" : { 
             "Fn::Select"		: [ "1", { "Fn::GetAZs": "" } ]
           },
@@ -227,8 +264,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "public-az2",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -243,7 +280,7 @@
       "Type" : "AWS::EC2::Subnet",
         "Properties" : {
           "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Ref" : "dPrivateSubnetAZ1" },
+          "CidrBlock"			: { "Ref" : "PrivateSubnetAZ1" },
           "AvailabilityZone" : { 
             "Fn::Select"		: [ "0", { "Fn::GetAZs": "" } ]
           },
@@ -258,8 +295,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "private-az1",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -273,7 +310,7 @@
       "Type" : "AWS::EC2::Subnet",
         "Properties" : {
           "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Ref" : "ePrivateSubnetAZ2" },
+          "CidrBlock"			: { "Ref" : "PrivateSubnetAZ2" },
           "AvailabilityZone" : { 
             "Fn::Select"		: [ "1", { "Fn::GetAZs": "" } ]
           },
@@ -288,8 +325,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "private-az2",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -305,7 +342,7 @@
       "Condition" : "PriDBSubAZ1",
         "Properties" : {
           "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Ref" : "fPrivateDBSubnetAZ1" },
+          "CidrBlock"			: { "Ref" : "PrivateDBSubnetAZ1" },
           "AvailabilityZone" : { 
             "Fn::Select"		: [ "0", { "Fn::GetAZs": "" } ]
           },
@@ -320,8 +357,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "privatedb-az1",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -336,7 +373,7 @@
       "Condition" : "PriDBSubAZ2",
         "Properties" : {
           "VpcId"			: { "Ref" : "ec2VPC" },
-          "CidrBlock"			: { "Ref" : "gPrivateDBSubnetAZ2" },
+          "CidrBlock"			: { "Ref" : "PrivateDBSubnetAZ2" },
           "AvailabilityZone" : { 
             "Fn::Select"		: [ "1", { "Fn::GetAZs": "" } ]
           },
@@ -351,8 +388,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "privatedb-az2",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -378,8 +415,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "public-rtb",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -405,8 +442,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "private-rtb1",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -431,8 +468,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "private-rtb2",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -459,8 +496,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "privatedb-rtb1",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -486,8 +523,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "privatedb-rtb2",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -608,8 +645,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "public-acl",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -628,7 +665,7 @@
           "Protocol"			: "-1",
           "RuleAction"			: "allow",
           "Egress"			: "false",
-          "CidrBlock"			: { "Ref" : "aVPCCIDRBlock" }
+          "CidrBlock"			: { "Ref" : "VPCCIDRBlock" }
         }
     },
     "ec2PublicSubnetAclEntryIn200" : {
@@ -676,7 +713,7 @@
           "PortRange"			: { "From" : "22", "To" : "22" },
           "RuleAction"			: "allow",
           "Egress"			: "false",
-          "CidrBlock"			: { "Ref" : "jSSHFrom" }
+          "CidrBlock"			: { "Ref" : "SSHFrom" }
         }
     },
     "ec2PublicSubnetAclEntryOut100" : {
@@ -687,7 +724,7 @@
           "Protocol"			: "-1",
           "RuleAction"			: "allow",
           "Egress"			: "true",
-          "CidrBlock"			: { "Ref" : "aVPCCIDRBlock" }
+          "CidrBlock"			: { "Ref" : "VPCCIDRBlock" }
         }
     },
     "ec2PublicSubnetAclEntryOut200" : {
@@ -757,8 +794,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "private-acl",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -777,7 +814,7 @@
           "Protocol"			: "-1",
           "RuleAction"			: "allow",
           "Egress"			: "false",
-          "CidrBlock"			: { "Ref" : "aVPCCIDRBlock" }
+          "CidrBlock"			: { "Ref" : "VPCCIDRBlock" }
         }
     },
     "ec2PrivateSubnetAclEntryIn200" : {
@@ -800,7 +837,7 @@
           "Protocol"			: "-1",
           "RuleAction"			: "allow",
           "Egress"			: "true",
-          "CidrBlock"			: { "Ref" : "aVPCCIDRBlock" }
+          "CidrBlock"			: { "Ref" : "VPCCIDRBlock" }
         }
     },
     "ec2PrivateSubnetAclEntryOut200" : {
@@ -844,8 +881,8 @@
 						"Fn::Join" : [
 						"-",
 						  [
-						    { "Ref" : "kOwnerService" },
-						    { "Ref" : "lStackEnv" },
+						    { "Ref" : "OwnerService" },
+						    { "Ref" : "StackEnv" },
 						     "privatedb-acl",
 						    { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
 						  ]
@@ -865,7 +902,7 @@
           "Protocol"			: "-1",
           "RuleAction"			: "allow",
           "Egress"			: "false",
-          "CidrBlock"			: { "Ref" : "aVPCCIDRBlock" }
+          "CidrBlock"			: { "Ref" : "VPCCIDRBlock" }
         }
     },
     "ec2PrivateDbSubnetAclEntryIn200" : {
@@ -929,7 +966,7 @@
           "Protocol"			: "-1",
           "RuleAction"			: "allow",
           "Egress"			: "true",
-          "CidrBlock"			: { "Ref" : "aVPCCIDRBlock" }
+          "CidrBlock"			: { "Ref" : "VPCCIDRBlock" }
         }
     },
     "ec2PrivateDbSubnetAclEntryOut200" : {
@@ -1007,8 +1044,8 @@
                                                 "Fn::Join" : [
                                                 "-",
                                                   [
-                                                    { "Ref" : "kOwnerService" },
-                                                    { "Ref" : "lStackEnv" },
+                                                    { "Ref" : "OwnerService" },
+                                                    { "Ref" : "StackEnv" },
                                                      "natsg",
                                                     { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
                                                   ]
@@ -1021,19 +1058,19 @@
           "IpProtocol"                  : "tcp",
           "FromPort"                    : "443",
           "ToPort"                      : "443",
-          "CidrIp"                      : { "Ref" : "aVPCCIDRBlock" }
+          "CidrIp"                      : { "Ref" : "VPCCIDRBlock" }
           },
           {
           "IpProtocol"                  : "tcp",
           "FromPort"                    : "80",
           "ToPort"                      : "80",
-          "CidrIp"                      : { "Ref" : "aVPCCIDRBlock" }
+          "CidrIp"                      : { "Ref" : "VPCCIDRBlock" }
           },
           {
           "IpProtocol"                  : "tcp",
           "FromPort"                    : "22",
           "ToPort"                      : "22",
-          "CidrIp"                      : { "Ref" : "jSSHFrom" }
+          "CidrIp"                      : { "Ref" : "SSHFrom" }
           }
         ],
         "SecurityGroupEgress" : [
@@ -1072,8 +1109,8 @@
                                                 "Fn::Join" : [
                                                 "-",
                                                   [
-                                                    { "Ref" : "kOwnerService" },
-                                                    { "Ref" : "lStackEnv" },
+                                                    { "Ref" : "OwnerService" },
+                                                    { "Ref" : "StackEnv" },
                                                      "eni1",
                                                     { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
                                                   ]
@@ -1105,11 +1142,11 @@
       "Properties" : {
         "AvailabilityZone"              : { "Fn::GetAtt" : [ "ec2PublicSubnetAZ1", "AvailabilityZone" ] },
         "ImageId"                       : { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "HVM" ] },
-        "InstanceType"                  : { "Ref" : "hInstanceType" },
+        "InstanceType"                  : { "Ref" : "InstanceType" },
         "Tenancy"                       : "default",
         "Monitoring"                    : "true",
         "DisableApiTermination"         : "true",
-        "KeyName"                       : { "Ref" : "iUserKeys" },
+        "KeyName"                       : { "Ref" : "UserKeys" },
         "NetworkInterfaces"             : [ {
               "DeleteOnTermination"     : "false",
               "DeviceIndex"             : "0",
@@ -1126,8 +1163,8 @@
                                                 "Fn::Join" : [
                                                 "-",
                                                   [
-                                                    { "Ref" : "kOwnerService" },
-                                                    { "Ref" : "lStackEnv" },
+                                                    { "Ref" : "OwnerService" },
+                                                    { "Ref" : "StackEnv" },
                                                      "nat1",
                                                     { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
                                                   ]
@@ -1157,8 +1194,8 @@
                                                 "Fn::Join" : [
                                                 "-",
                                                   [
-                                                    { "Ref" : "kOwnerService" },
-                                                    { "Ref" : "lStackEnv" },
+                                                    { "Ref" : "OwnerService" },
+                                                    { "Ref" : "StackEnv" },
                                                      "eni2",
                                                     { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
                                                   ]
@@ -1190,11 +1227,11 @@
       "Properties" : {
         "AvailabilityZone"              : { "Fn::GetAtt" : [ "ec2PublicSubnetAZ2", "AvailabilityZone" ] },
         "ImageId"                       : { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "HVM" ] },
-        "InstanceType"                  : { "Ref" : "hInstanceType" },
+        "InstanceType"                  : { "Ref" : "InstanceType" },
         "Tenancy"                       : "default",
         "Monitoring"                    : "true",
         "DisableApiTermination"         : "true",
-        "KeyName"                       : { "Ref" : "iUserKeys" },
+        "KeyName"                       : { "Ref" : "UserKeys" },
         "NetworkInterfaces"             : [ {
               "DeleteOnTermination"     : "false",
               "DeviceIndex"             : "0",
@@ -1211,8 +1248,8 @@
                                                 "Fn::Join" : [
                                                 "-",
                                                   [
-                                                    { "Ref" : "kOwnerService" },
-                                                    { "Ref" : "lStackEnv" },
+                                                    { "Ref" : "OwnerService" },
+                                                    { "Ref" : "StackEnv" },
                                                      "nat2",
                                                     { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "Abbr" ] }
                                                   ]
