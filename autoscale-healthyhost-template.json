@@ -2,80 +2,116 @@
   "AWSTemplateFormatVersion" : "2010-09-09",
   "Description" : "CloudWatch and AutoScaling monitor ELB/Instances - HealthyCount.",
 
+  "Metadata" : {
+    "AWS::CloudFormation::Interface" : {
+    "ParameterGroups" : [
+      {
+        "Label"                         : { "default" : "Instance Config" },
+        "Parameters"                    : [ "InstanceType", "UserAMI", "UserKeys", "SecurityGroup" ]
+      },
+      {
+        "Label"                         : { "default" : "ELB Config" },
+        "Parameters"                    : [ "ELBName", "AvailZones", "Subnets" ]
+      },
+      {
+        "Label"                         : { "default" : "Autoscale Config" },
+        "Parameters"                    : [ "DesiredCapacity", "MaxSize", "MinSize", "ScalingAdjUp", "ScalingAdjDn", "ThresholdLow", "ThresholdHigh", "SNSEmail" ]
+      }
+    ],
+    "ParameterLabels" : {
+        "InstanceType"                  : { "default" : "Instance type" },
+        "UserAMI"                       : { "default" : "Instance AMI" },
+        "UserKeys"                      : { "default" : "Instance PEM keys" },
+        "SecurityGroup"                 : { "default" : "Instance security group" },
+        "ELBName"                       : { "default" : "ELB name" },
+        "AvailZones"                    : { "default" : "ELB availability zones" },
+        "Subnets"                       : { "default" : "Private subnets" },
+        "DesiredCapacity"               : { "default" : "Desired number of instnces" },
+        "MaxSize"                       : { "default" : "Max size of ASG" },
+        "MinSize"                       : { "default" : "Min size of ASG" },
+        "ScalingAdjUp"                  : { "default" : "Scale up by" },
+        "ScalingAdjDn"                  : { "default" : "Scale down by" },
+        "ThresholdLow"                  : { "default" : "Alram threshold low" },
+        "ThresholdHigh"                 : { "default" : "Alarm threshold high" },
+        "SNSEmail"                      : { "default" : "Alarm email address" }
+      }
+    }
+  },
+
   "Parameters" : {
-    "aInstanceType" : {
+    "InstanceType" : {
         "Type"                          : "String",
         "Default"                       : "m3.medium",
         "AllowedValues"                 : ["t2.micro", "m3.medium", "m3.large", "m3.xlarge"],
-        "Description"                   : "Instance size."
+        "Description"                   : "Instance type and size."
     },
-    "bUserAMI" : {
+    "UserAMI" : {
         "Type"                          : "AWS::EC2::Image::Id",
         "Default"                       : "ami-8e682ce6",
         "Description"                   : "Your instance image."
     },
-    "cUserKeys" : {
+    "UserKeys" : {
         "Type"                          : "AWS::EC2::KeyPair::KeyName",
         "Description"                   : "Your instance key pair name."
     },
-    "dSecurityGroup" : {
+    "SecurityGroup" : {
         "Type"                          : "AWS::EC2::SecurityGroup::Id",
         "Description"                   : "Instance security group."
     },
-    "eELBName" : {
+    "ELBName" : {
         "Type"                          : "String",
         "Default"                       : "myELB",
         "AllowedPattern"                : "[-a-zA-Z]*",
         "Description"                   : "Enter the name of your Load Balancer."
     },
-    "fAvailZones" : {
+    "AvailZones" : {
         "Type"                          : "List<AWS::EC2::AvailabilityZone::Name>",
-        "Description"                   : "Enter the availability-zones for your private subnets."
+        "Description"                   : "Select the availability-zones for your private subnets."
     },
-    "gSubnets" : {
+    "Subnets" : {
         "Type"                          : "List<AWS::EC2::Subnet::Id>",
         "Description"                   : "Subnet Ids for your private subnets. (Note: Must match the availability-zones above.)"
     },
-    "hDesiredCapacity" : {
+    "DesiredCapacity" : {
         "Type"                          : "Number",
         "Default"                       : "4",
         "Description"                   : "Number of instances that should be running."
     },
-    "iMaxSize" : {
+    "MaxSize" : {
         "Type"                          : "Number",
         "Default"                       : "8",
         "Description"                   : "Maximum size of the autoscale group."
     },
-    "jMinSize" : {
+    "MinSize" : {
         "Type"                          : "Number",
         "Default"                       : "2",
         "Description"                   : "Minimum size of the autoscale group."
     },
-    "kScalingAdjUp" : {
+    "ScalingAdjUp" : {
         "Type"                          : "Number",
         "Default"                       : "2",
         "Description"                   : "Number of instances by which to scale up."
     },
-    "lScalingAdjDn" : {
+    "ScalingAdjDn" : {
         "Type"                          : "Number",
         "Default"                       : "-2",
         "Description"                   : "Number of instances by which to scale down."
     },
-    "mThresholdLow" : {
+    "ThresholdLow" : {
         "Type"                          : "Number",
         "Default"                       : "1",
         "Description"                   : "Low threshold for CloudWatch alarm."
     },
-    "nThresholdHigh" : {
+    "ThresholdHigh" : {
         "Type"                          : "Number",
         "Default"                       : "2",
         "Description"                   : "High threshold for CloudWatch alarm."
     },
-    "oSNSEmail" : {
+    "SNSEmail" : {
         "Type"                          : "String",
         "Default"                       : "foo@bar.com",
         "AllowedPattern"                : "[-a-z0-9]*\\@[-a-z0-9]*\\.[a-z]*",
-        "Description"                   : "Where should alarms be sent."
+        "Description"                   : "Where alarms should be sent."
     }
   },
 
@@ -86,7 +122,7 @@
         "TopicName"                     : { "Fn::Join" : ["-", [ { "Ref" : "AWS::StackName"}, "elb-scaling" ] ] },
         "Subscription"                  : [
           {
-          "Endpoint"                    : { "Ref" : "oSNSEmail" },
+          "Endpoint"                    : { "Ref" : "SNSEmail" },
           "Protocol"                    : "email"
           }
         ]
@@ -96,11 +132,11 @@
     "alcServerlaunch" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Properties" : {
-        "ImageId"                       : { "Ref" : "bUserAMI" },
-        "KeyName"                       : { "Ref" : "cUserKeys" },
-        "InstanceType"                  : { "Ref" : "aInstanceType" },
-        "SecurityGroups"                : [ { "Ref" : "dSecurityGroup" } ],
-        "AssociatePublicIpAddress"	: "false",
+        "ImageId"                       : { "Ref" : "UserAMI" },
+        "KeyName"                       : { "Ref" : "UserKeys" },
+        "InstanceType"                  : { "Ref" : "InstanceType" },
+        "SecurityGroups"                : [ { "Ref" : "SecurityGroup" } ],
+        "AssociatePublicIpAddress"      : "false",
         "UserData" : {
           "Fn::Base64" : {
             "Fn::Join" : [ "",
@@ -119,16 +155,16 @@
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "DependsOn" : [ "snsASTopic" ],
       "Properties" : {
-        "AvailabilityZones"             : { "Ref" : "fAvailZones" },
-        "VPCZoneIdentifier"             : { "Ref" : "gSubnets" },
+        "AvailabilityZones"             : { "Ref" : "AvailZones" },
+        "VPCZoneIdentifier"             : { "Ref" : "Subnets" },
         "Cooldown"                      : "120",
-        "DesiredCapacity"               : { "Ref" : "hDesiredCapacity" },
-        "MaxSize"                       : { "Ref" : "iMaxSize" },
-        "MinSize"                       : { "Ref" : "jMinSize" },
+        "DesiredCapacity"               : { "Ref" : "DesiredCapacity" },
+        "MaxSize"                       : { "Ref" : "MaxSize" },
+        "MinSize"                       : { "Ref" : "MinSize" },
         "HealthCheckType"               : "ELB",
         "HealthCheckGracePeriod"        : "180",
         "LaunchConfigurationName"       : { "Ref" : "alcServerlaunch" },
-        "LoadBalancerNames"             : [ { "Ref" : "eELBName" } ],
+        "LoadBalancerNames"             : [ { "Ref" : "ELBName" } ],
         "NotificationConfiguration" : {
           "TopicARN"          : { "Ref" : "snsASTopic" },
           "NotificationTypes" : [ 
@@ -141,16 +177,16 @@
       },
       "CreationPolicy" : {
         "ResourceSignal" : {
-        "Count"				: { "Ref" : "hDesiredCapacity" },
-        "Timeout"			: "PT5M"
+        "Count"                         : { "Ref" : "DesiredCapacity" },
+        "Timeout"                       : "PT5M"
         }
       },
       "UpdatePolicy" : {
         "AutoScalingRollingUpdate" : {
-          "MinInstancesInService"	: { "Ref" : "jMinSize" }, 
-          "MaxBatchSize"		: "2",
-          "PauseTime"			: "PT2M",
-          "WaitOnResourceSignals"	: "true"
+          "MinInstancesInService"       : { "Ref" : "MinSize" }, 
+          "MaxBatchSize"                : "2",
+          "PauseTime"                   : "PT2M",
+          "WaitOnResourceSignals"       : "true"
         }
       }
     },
@@ -162,7 +198,7 @@
       "AdjustmentType"                  : "ChangeInCapacity",
       "AutoScalingGroupName"            : { "Ref" : "asgServergroup" },
       "Cooldown"                        : "300",
-      "ScalingAdjustment"               : { "Ref" : "kScalingAdjUp" }
+      "ScalingAdjustment"               : { "Ref" : "ScalingAdjUp" }
       }
     },
     "aspServerscaleDN" : {
@@ -171,7 +207,7 @@
       "Properties" : {
       "AdjustmentType"                  : "ChangeInCapacity",
       "AutoScalingGroupName"            : { "Ref" : "asgServergroup" },
-      "ScalingAdjustment"               : { "Ref" : "lScalingAdjDn" }
+      "ScalingAdjustment"               : { "Ref" : "ScalingAdjDn" }
       }
     },
 
@@ -184,7 +220,7 @@
       "Statistic"                       : "Maximum",
       "Period"                          : "60",
       "EvaluationPeriods"               : "2",
-      "Threshold"                       : { "Ref" : "mThresholdLow" },
+      "Threshold"                       : { "Ref" : "ThresholdLow" },
       "AlarmActions"                    : [ { "Ref" : "aspServerscaleUP" } ],
       "Dimensions"                      : [ { "Name": "AutoScalingGroupName", "Value": { "Ref": "asgServergroup" } } ],
       "ComparisonOperator"              : "LessThanOrEqualToThreshold"
@@ -199,7 +235,7 @@
       "Statistic"                       : "Maximum",
       "Period"                          : "60",
       "EvaluationPeriods"               : "2",
-      "Threshold"                       : { "Ref" : "nThresholdHigh" },
+      "Threshold"                       : { "Ref" : "ThresholdHigh" },
       "AlarmActions"                    : [ { "Ref" : "aspServerscaleDN" } ],
       "Dimensions"                      : [ { "Name": "AutoScalingGroupName", "Value": { "Ref": "asgServergroup" } } ],
       "ComparisonOperator"              : "GreaterThanOrEqualToThreshold"
