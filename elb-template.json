@@ -2,31 +2,49 @@
   "AWSTemplateFormatVersion" : "2010-09-09",
   "Description" : "Public Facing SSL ELB template.",
 
+  "Metadata" : {
+    "AWS::CloudFormation::Interface" : {
+    "ParameterGroups" : [
+      {
+        "Label"                         : { "default" : "Load Balancer Config" },
+        "Parameters"                    : [ "WebInstancePort", "WebTarget", "PublicSubnets", "SecurityGroupId", "SSLCertARN" ]
+      }
+    ],
+    "ParameterLabels" : {
+        "WebInstancePort"               : { "default" : "Instance port" },
+        "WebTarget"                     : { "default" : "Health check URI" },
+        "PublicSubnets"                 : { "default" : "ELB public subnets" },
+        "SecurityGroupId"               : { "default" : "ELB security group" },
+        "SSLCertARN"                    : { "default" : "Certificate ARN" }
+      }
+    }
+  },
+
   "Parameters" : {
-    "aWebInstancePort" : {
-        "Type"                                  : "Number",
-        "Default"                               : "8080",
-        "Description"                           : "Enter the port your web instances will listen on."
+    "WebInstancePort" : {
+        "Type"                          : "Number",
+        "Default"                       : "8080",
+        "Description"                   : "Enter the port your web instances will listen on."
     },
-    "bWebTarget" : {
-        "Type"                                  : "String",
-        "Default"                               : "/index.html",
-        "AllowedPattern"                        : "/[a-zA-Z0-9.-]*",
-        "Description"                           : "Enter the web instance health check URI."
+    "WebTarget" : {
+        "Type"                          : "String",
+        "Default"                       : "/index.html",
+        "AllowedPattern"                : "/[a-zA-Z0-9.-]*",
+        "Description"                   : "Enter the web instance health check URI."
     },
-    "cPublicSubnets" : {
-        "Type"                                  : "List<AWS::EC2::Subnet::Id>",
-        "Description"                           : "Enter the subnet ids for your public subnets."
+    "PublicSubnets" : {
+        "Type"                          : "List<AWS::EC2::Subnet::Id>",
+        "Description"                   : "Enter the subnet ids for your public subnets."
     },
-    "dSecurityGroupId" : {
-        "Type"                                  : "List<AWS::EC2::SecurityGroup::Id>",
-        "Description"                           : "Enter one or more security group ids."
+    "SecurityGroupId" : {
+        "Type"                          : "List<AWS::EC2::SecurityGroup::Id>",
+        "Description"                   : "Enter one or more security group ids."
     },
-    "eSSLCertARN" : {
-        "Type"                                  : "String",
-        "Default"                               : "arn:aws:iam::012345678901:server-certificate/my.cert.com",
-        "AllowedPattern"                        : "arn:aws:iam::[0-9]+:server-certificate/[a-zA-Z0-9.-]*",
-        "Description"                           : "Enter the site SSL cerificate ARN."
+    "SSLCertARN" : {
+        "Type"                          : "String",
+        "Default"                       : "arn:aws:iam::012345678901:server-certificate/my.cert.com",
+        "AllowedPattern"                : "arn:aws:iam::[0-9]+:server-certificate/[a-zA-Z0-9.-]*",
+        "Description"                   : "Enter the site SSL cerificate ARN."
     }
   },
 
@@ -39,16 +57,16 @@
     "S3LoggingBucketPolicy" : {
         "Type" : "AWS::S3::BucketPolicy",
         "Properties" : {
-          "Bucket"                              : { "Ref" : "S3LoggingBucket" },
+          "Bucket"                      : { "Ref" : "S3LoggingBucket" },
           "PolicyDocument" : {
-            "Version"                           : "2008-10-17",
+            "Version"                   : "2008-10-17",
             "Statement" : [ {
-              "Effect"                          : "Allow",
+              "Effect"                  : "Allow",
               "Resource" : {
                 "Fn::Join" : [ "", [ "arn:aws:s3:::", { "Ref": "S3LoggingBucket" }, "/AWSLogs/", { "Ref": "AWS::AccountId" }, "/*" ] ]
               },
-              "Principal"                       : { "AWS": "*" },
-              "Action"                          : [ "s3:PutObject" ]
+              "Principal"               : { "AWS": "*" },
+              "Action"                  : [ "s3:PutObject" ]
             } ]
           }
         }
@@ -58,45 +76,45 @@
         "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
         "DependsOn": [ "S3LoggingBucketPolicy" ],
         "Properties" : {
-          "Subnets"                             : { "Ref" : "cPublicSubnets"  },
-          "CrossZone"                           : "true",
-          "SecurityGroups"                      : { "Ref" : "dSecurityGroupId"  },
+          "Subnets"                     : { "Ref" : "PublicSubnets"  },
+          "CrossZone"                   : "true",
+          "SecurityGroups"              : { "Ref" : "SecurityGroupId"  },
           "LBCookieStickinessPolicy" : [ {
-            "PolicyName"                        : "StickyPolicy",
-            "CookieExpirationPeriod"            : "300"
+            "PolicyName"                : "StickyPolicy",
+            "CookieExpirationPeriod"    : "300"
           } ],
           "HealthCheck" : 
           {
-            "HealthyThreshold"                  : "2",
-            "Interval"                          : "10",
+            "HealthyThreshold"          : "2",
+            "Interval"                  : "10",
             "Target" : {
-              "Fn::Join" : [ "", [ "HTTP", ":", { "Ref" : "aWebInstancePort" }, { "Ref" : "bWebTarget" } ] ]
+              "Fn::Join" : [ "", [ "HTTP", ":", { "Ref" : "WebInstancePort" }, { "Ref" : "WebTarget" } ] ]
             },
-            "Timeout"                           : "5",
-            "UnhealthyThreshold"                : "3"
+            "Timeout"                   : "5",
+            "UnhealthyThreshold"        : "3"
           },
           "Listeners" : [
           {
-            "InstancePort"                      : { "Ref" : "aWebInstancePort" },
-            "InstanceProtocol"                  : "HTTP",
-            "LoadBalancerPort"                  : "443",
-            "Protocol"                          : "HTTPS",
-            "SSLCertificateId"                  : { "Ref" : "eSSLCertARN" },
-            "PolicyNames"                       : [ "StickyPolicy", "ELBSecurity-Policy-2015-05" ]
+            "InstancePort"              : { "Ref" : "WebInstancePort" },
+            "InstanceProtocol"          : "HTTP",
+            "LoadBalancerPort"          : "443",
+            "Protocol"                  : "HTTPS",
+            "SSLCertificateId"          : { "Ref" : "SSLCertARN" },
+            "PolicyNames"               : [ "StickyPolicy", "ELBSecurity-Policy-2015-05" ]
           } ],
           "ConnectionDrainingPolicy": {
-            "Enabled"                           : "true",
-            "Timeout"                           : "60"
+            "Enabled"                   : "true",
+            "Timeout"                   : "60"
           },
           "AccessLoggingPolicy" : {
-            "S3BucketName"                      : { "Ref" : "S3LoggingBucket" },
-            "Enabled"                           : "true",
-            "EmitInterval"                      : "60"
+            "S3BucketName"              : { "Ref" : "S3LoggingBucket" },
+            "Enabled"                   : "true",
+            "EmitInterval"              : "60"
           },
           "Policies" : [
           {
-            "PolicyName"                        : "ELBSecurity-Policy-2015-05",
-            "PolicyType"                        : "SSLNegotiationPolicyType",
+            "PolicyName"                : "ELBSecurity-Policy-2015-05",
+            "PolicyType"                : "SSLNegotiationPolicyType",
               "Attributes": [
                  { "Name" : "Protocol-SSLv2",
                   "Value" : "false"
