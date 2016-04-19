@@ -6,7 +6,7 @@
     "AWS::CloudFormation::Interface" : {
     "ParameterGroups" : [
       {
-        "Label"                         : { "default" : "Network Configuration" },
+        "Label"                         : { "default" : "Network Config" },
         "Parameters"                    : [ "VPCCIDRBlock", "PublicSubnetAZ1", "PublicSubnetAZ2", "PrivateSubnetAZ1", "PrivateSubnetAZ2" ]
       },
       {
@@ -18,7 +18,7 @@
         "Parameters"                    : [ "OwnerService", "StackEnv" ]
       },
       {
-        "Label"                         : { "default" : "NAT Instance Setup" },
+        "Label"                         : { "default" : "NAT Instance Config" },
         "Parameters"                    : [ "InstanceType", "UserKeys", "SSHFrom" ]
       }
     ],
