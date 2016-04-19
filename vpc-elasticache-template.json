@@ -628,17 +628,17 @@
         "Properties" : {
           "TemplateURL"                 : "https://s3-us-west-2.amazonaws.com/toddm92/public/templates/cfn/elasticache-template.json",
           "Parameters" : {
-            "aCacheNodeType"            : "cache.t1.micro",
-            "bNumberOfCacheNodes"       : "3",
-            "cCachePort"                : "11211",
-            "dVPCId"                    : { "Ref" : "ec2VPC" },
-            "eCacheSubnets"             : { "Fn::Join" : [ ",",
+            "CacheNodeType"            : "cache.t1.micro",
+            "NumberOfCacheNodes"       : "3",
+            "CachePort"                : "11211",
+            "VPCId"                    : { "Ref" : "ec2VPC" },
+            "CacheSubnets"             : { "Fn::Join" : [ ",",
                                             [
                                               { "Ref" : "ec2Private1SubnetAZ1" },
                                               { "Ref" : "ec2Private1SubnetAZ2" }
                                             ]
                                           ] },
-            "fTestSecurityGroup"        : { "Ref" : "ec2TestSecurityGroup" }
+            "TestSecurityGroup"        : { "Ref" : "ec2TestSecurityGroup" }
           }
         }
     }
