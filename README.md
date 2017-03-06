@@ -58,7 +58,7 @@
 
 ===
 
-Build an entire AWS environment with Templates:
+**Build an entire AWS environment with Templates:**
 
 https://github.com/toddm92/mock-aws-env
 
