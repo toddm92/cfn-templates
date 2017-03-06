@@ -55,3 +55,10 @@
 13. **vpc-elasticache-template.json**
 
   * Creates a VPC with four subnets in two availability zones. Calls the *elasticache-template.json* nested stack.
+
+===
+
+Build an entire AWS environment with Templates:
+
+https://github.com/toddm92/mock-aws-env
+
