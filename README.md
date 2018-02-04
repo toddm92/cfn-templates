@@ -10,53 +10,57 @@
 
   * Bastion host on-demand. Launch a bastion (jump host) into a public subnet to access your VPC via SSH.  Terminate the server when unused.
 
-3. **cloudwatch-iam-alarms-template.json** 
+3. **cis-benchmark-section3-template.json**
+
+  * AWS CIS Foundations Benchmark v1.1.0 11-09-2016 remediation template. (Remediates Sections 3.x & 2.1-2.4)
+
+4. **cloudwatch-iam-alarms-template.json** 
 
   * Creates CloudTrail IAM API activity alarms for CloudWatch logs.
 
-4. **elasticache-template.json**
+5. **elasticache-template.json**
 
   * Creates an ElastiCache cluster in a VPC.
 
-5. **elb-template.json**
+6. **elb-template.json**
 
   * Secure public facing SSL ELB template.  Create and manage your SSL cipher policy.
 
-6. **iam-poweruser-template.json**
+7. **iam-poweruser-template.json**
 
   * Creates an IAM "power user" group and inline policy.
 
-7. **nat-instance-template.json**
+8. **nat-instance-template.json**
 
   * Deploys a NAT instance with the option for enhanced network capabilities into a public subnet.
 
-8. **rds-replica-template.json**
+9. **rds-replica-template.json**
 
   * Create a multi-AZ provisioned IOps RDS instance with an optional read replica.
 
-9. **s3-logging-bucket.json**
+10. **s3-logging-bucket.json**
 
   * Create a S3 logging bucket, bucket policy and retension policy in the region the stack is launched in.
 
-10. **spot-fleet-template.json**
+11. **spot-fleet-template.json**
 
  * Creates and deploys a Spot Fleet into two availability-zones/Subnets and autoscales based on the average CPU of the Fleet.
 
-11. **vpc-2az-natgw-template.json**
+12. **vpc-2az-natgw-template.json**
 
   * Creates a VPC with AWS NAT Gateways in 2 availability-zones, 4-6 subnets (optional Db subnet tier).
 
-12. **vpc-2az-template.json**
+13. **vpc-2az-template.json**
 
   * Creates a VPC with Managed NAT instances in 2 availability-zones, 4-6 subnets (optional Db subnet tier).
   * https://s3-us-west-2.amazonaws.com/toddm92/public/diagrams/vpc-2az-diagram.jpg
 
-13. **vpc-beanstalk-template.json**
+14. **vpc-beanstalk-template.json**
 
   * Creates a VPC with four subnets in two availability zones. Launches an Elastic Beanstalk environment.
   * https://s3-us-west-2.amazonaws.com/toddm92/public/diagrams/vpc-beanstalk-env.jpg
 
-14. **vpc-elasticache-template.json**
+15. **vpc-elasticache-template.json**
 
   * Creates a VPC with four subnets in two availability zones. Calls the *elasticache-template.json* nested stack.
 

@@ -1,0 +1,637 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "AWS CIS Foundations Benchmark v1.1.0 11-09-2016 remediation template. (Remediates Sections 3.x & 2.1-2.4)",
+
+  "Parameters" : {
+
+    "Email" : {
+      "Type" : "String",
+      "Default" : "user@foobar.com",
+      "AllowedPattern" : "[-a-z0-9]*\\@[-a-z0-9]*\\.[a-z]*",
+      "Description" : "Where CIS alarm notifications should be sent."
+    },
+    "TrailLogGroupName" : {
+      "Type" : "String",
+      "Default" : "CloudTrail/DefaultLogGroup",
+      "AllowedPattern" : "[\\w-/.]+",
+      "Description" : "The name for your CloudTrail LogGroup."
+    }
+  },
+
+  "Mappings" : {
+
+    "FilterAlarmNames": {
+      "CIS-301" : { "metric" : "unauthorized_api_calls_metric",
+                     "alarm" : "unauthorized_api_calls_alarm" },
+      "CIS-302" : { "metric" : "no_mfa_console_signin_metric",
+                     "alarm" : "no_mfa_console_signin_alarm" },
+      "CIS-303" : { "metric" : "root_usage_metric",
+                     "alarm" : "root_usage_alarm" },
+      "CIS-304" : { "metric" : "iam_changes_metric",
+                     "alarm" : "iam_changes_alarm" },
+      "CIS-305" : { "metric" : "cloudtrail_cfg_changes_metric",
+                     "alarm" : "cloudtrail_cfg_changes_alarm" },
+      "CIS-306" : { "metric" : "console_signin_failure_metric",
+                     "alarm" : "console_signin_failure_alarm" },
+      "CIS-307" : { "metric" : "disable_or_delete_cmk_metric",
+                     "alarm" : "disable_or_delete_cmk_alarm" },
+      "CIS-308" : { "metric" : "s3_bucket_policy_changes_metric",
+                     "alarm" : "s3_bucket_policy_changes_alarm" },
+      "CIS-309" : { "metric" : "aws_config_changes_metric",
+                     "alarm" : "aws_config_changes_alarm" },
+      "CIS-310" : { "metric" : "security_group_changes_metric",
+                     "alarm" : "security_group_changes_alarm" },
+      "CIS-311" : { "metric" : "nacl_changes_metric",
+                     "alarm" : "nacl_changes_alarm" },
+      "CIS-312" : { "metric" : "network_gw_changes_metric",
+                     "alarm" : "network_gw_changes_alarm" },
+      "CIS-313" : { "metric" : "route_table_changes_metric",
+                     "alarm" : "route_table_changes_alarm" },
+      "CIS-314" : { "metric" : "vpc_changes_metric",
+                     "alarm" : "vpc_changes_alarm" }
+    }
+  },
+
+  "Conditions" : {
+
+    "NoGlacierSupport" : {
+        "Fn::Equals" : [ { "Ref" : "AWS::Region" }, "sa-east-1" ]
+    }
+  },
+
+  "Resources" : {
+
+    "CloudTrailS3Bucket" : {
+      "DeletionPolicy" : "Retain",
+      "Type" : "AWS::S3::Bucket",
+      "Properties" : {
+        "BucketName" : { "Fn::Join" : [ "-", [ "cloudtrail", { "Ref" : "AWS::AccountId" }, "logs" ] ] },
+        "LifecycleConfiguration" : {
+          "Rules" : [
+            {
+              "Id" : "ArchiveRule",
+              "Status" : "Enabled",
+              "ExpirationInDays" : "365",
+              "Transition" : {
+                "Fn::If" : [ "NoGlacierSupport",
+                  { "Ref" : "AWS::NoValue" },
+                  { "TransitionInDays" : "90", "StorageClass" : "Glacier" }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+
+    "CloudTrailS3BucketPolicy" : {
+      "Type" : "AWS::S3::BucketPolicy",
+      "DependsOn" : [ "CloudTrailS3Bucket" ],
+      "Properties" : {
+        "Bucket" : { "Ref" : "CloudTrailS3Bucket" },
+        "PolicyDocument" : {
+          "Version" : "2012-10-17",
+          "Statement" : [
+            {
+              "Sid" : "AWSCloudTrailAclCheck20150319",
+              "Effect" : "Allow",
+              "Principal" : { "Service" : "cloudtrail.amazonaws.com" },
+              "Action" : "s3:GetBucketAcl",
+              "Resource" : { "Fn::Join" : [ "", [ "arn:aws:s3:::", { "Ref" : "CloudTrailS3Bucket" } ] ] }
+            },
+            {
+              "Sid": "AWSCloudTrailWrite20150319",
+              "Effect" : "Allow",
+              "Principal" : { "Service" : "cloudtrail.amazonaws.com" },
+              "Action" : "s3:PutObject",
+              "Resource" : { "Fn::Join" : [ "", [ "arn:aws:s3:::", { "Ref" : "CloudTrailS3Bucket" }, "/AWSLogs/", { "Ref" : "AWS::AccountId" }, "/*" ] ] },
+              "Condition" : { "StringEquals" : { "s3:x-amz-acl" : "bucket-owner-full-control" } }
+            }
+          ]
+        }
+      }
+    },
+
+    "TrailLogGroup" : {
+      "Type" : "AWS::Logs::LogGroup",
+      "Properties" : {
+        "LogGroupName" : { "Ref" : "TrailLogGroupName" },
+        "RetentionInDays" : 90
+      }
+    },
+
+    "TrailLogGroupRole" : {
+      "Type" : "AWS::IAM::Role",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "RoleName" : "trail-log-role",
+        "AssumeRolePolicyDocument" : {
+          "Version" : "2012-10-17",
+          "Statement" : [ {
+            "Effect" : "Allow",
+            "Principal" : {"Service" : [ "cloudtrail.amazonaws.com" ] },
+            "Action" : [ "sts:AssumeRole" ]
+          } ]
+        },
+        "Policies" : [ {
+          "PolicyName" : "trail-log-policy",
+          "PolicyDocument" : {
+            "Version" : "2012-10-17",
+            "Statement" : [ {
+              "Effect" : "Allow",
+              "Action" : [ "logs:CreateLogStream", "logs:PutLogEvents" ],
+              "Resource" : { "Fn::GetAtt" : [ "TrailLogGroup", "Arn" ] },
+            } ]
+          }
+        } ]
+      }
+    },
+
+    "Trail" : {
+      "Type" : "AWS::CloudTrail::Trail",
+      "DependsOn" : [ "CloudTrailS3BucketPolicy", "TrailLogGroup", "TrailLogGroupRole" ],
+      "Properties" : {
+        "TrailName" : "cis_benchmark_trail",
+        "S3BucketName" : { "Ref" : "CloudTrailS3Bucket" },
+        "IsLogging" : true,
+        "IncludeGlobalServiceEvents" : true,
+        "IsMultiRegionTrail" : true,
+        "EnableLogFileValidation" : true,
+        "CloudWatchLogsLogGroupArn" : { "Fn::GetAtt" : [ "TrailLogGroup", "Arn" ] },
+        "CloudWatchLogsRoleArn" : { "Fn::GetAtt" : [ "TrailLogGroupRole", "Arn" ] }
+      }
+    },
+
+    "AlarmTopic" : {
+      "Type" : "AWS::SNS::Topic",
+      "Properties" : {
+        "TopicName" : "cis_benchmark_topic",
+        "Subscription" : [ {
+          "Endpoint" : { "Ref" : "Email" },
+          "Protocol" : "email"
+        } ]
+      }
+    },
+
+    "CIS301MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.errorCode = \"*UnauthorizedOperation\") || ($.errorCode = \"AccessDenied*\" )}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-301", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS301CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-301", "alarm" ] },
+        "AlarmDescription" : "Alarm for unauthorized API calls (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-301", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS302MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{( $.eventName = \"ConsoleLogin\" ) && ( $.additionalEventData.MFAUsed != \"Yes\" )}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-302", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS302CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-302", "alarm" ] },
+        "AlarmDescription" : "Alarm for Management Console sign-in without MFA (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-302", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS303MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{( $.userIdentity.type = \"Root\" ) && ( $.userIdentity.invokedBy NOT EXISTS ) && ( $.eventType != \"AwsServiceEvent\" )}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-303", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS303CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-303", "alarm" ] },
+        "AlarmDescription" : "Alarm for usage of root account (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-303", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS304MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventName = DeleteGroupPolicy) || ($.eventName = DeleteRolePolicy) || ($.eventName = DeleteUserPolicy) || ($.eventName = PutGroupPolicy) || ($.eventName = PutRolePolicy) || ($.eventName = PutUserPolicy) || ($.eventName = CreatePolicy) || ($.eventName = DeletePolicy) || ($.eventName = CreatePolicyVersion) || ($.eventName = DeletePolicyVersion) || ($.eventName = AttachRolePolicy) || ($.eventName = DetachRolePolicy) || ($.eventName = AttachUserPolicy) || ($.eventName = DetachUserPolicy) || ($.eventName = AttachGroupPolicy) || ($.eventName = DetachGroupPolicy)}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-304", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS304CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-304", "alarm" ] },
+        "AlarmDescription" : "Alarm for IAM policy changes (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-304", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS305MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventName = CreateTrail) || ($.eventName = UpdateTrail) || ($.eventName = DeleteTrail) || ($.eventName = StartLogging) || ($.eventName = StopLogging)}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-305", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS305CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-305", "alarm" ] },
+        "AlarmDescription" : "Alarm for CloudTrail configuration changes (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-305", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS306MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventName = ConsoleLogin) && ($.errorMessage = \"Failed authentication\")}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-306", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS306CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-306", "alarm" ] },
+        "AlarmDescription" : "Alarm for AWS Management Console authentication failures (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-306", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS307MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventSource = kms.amazonaws.com) && (($.eventName = DisableKey) || ($.eventName = ScheduleKeyDeletion))}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-307", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS307CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-307", "alarm" ] },
+        "AlarmDescription" : "Alarm for disabling or scheduled deletion of customer created CMKs (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-307", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS308MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventSource = s3.amazonaws.com) && (($.eventName = PutBucketAcl) || ($.eventName = PutBucketPolicy) || ($.eventName = PutBucketCors) || ($.eventName = PutBucketLifecycle) || ($.eventName = PutBucketReplication) || ($.eventName = DeleteBucketPolicy) || ($.eventName = DeleteBucketCors) || ($.eventName = DeleteBucketLifecycle) || ($.eventName = DeleteBucketReplication))}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-308", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS308CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-308", "alarm" ] },
+        "AlarmDescription" : "Alarm for S3 bucket policy changes (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-308", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS309MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventSource = config.amazonaws.com) && (($.eventName = StopConfigurationRecorder) || ($.eventName = DeleteDeliveryChannel) || ($.eventName = PutDeliveryChannel) || ($.eventName = PutConfigurationRecorder))}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-309", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS309CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-309", "alarm" ] },
+        "AlarmDescription" : "Alarm for AWS Config configuration changes (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-309", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS310MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventName = AuthorizeSecurityGroupIngress) || ($.eventName = AuthorizeSecurityGroupEgress) || ($.eventName = RevokeSecurityGroupIngress) || ($.eventName = RevokeSecurityGroupEgress) || ($.eventName = CreateSecurityGroup) || ($.eventName = DeleteSecurityGroup)}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-310", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS310CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-310", "alarm" ] },
+        "AlarmDescription" : "Alarm for security group changes (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-310", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS311MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventName = CreateNetworkAcl) || ($.eventName = CreateNetworkAclEntry) || ($.eventName = DeleteNetworkAcl) || ($.eventName = DeleteNetworkAclEntry) || ($.eventName = ReplaceNetworkAclEntry) || ($.eventName = ReplaceNetworkAclAssociation)}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-311", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS311CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-311", "alarm" ] },
+        "AlarmDescription" : "Alarm for changes to Network Access Control Lists (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-311", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS312MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventName = CreateCustomerGateway) || ($.eventName = DeleteCustomerGateway) || ($.eventName = AttachInternetGateway) || ($.eventName = CreateInternetGateway) || ($.eventName = DeleteInternetGateway) || ($.eventName = DetachInternetGateway)}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-312", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS312CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-312", "alarm" ] },
+        "AlarmDescription" : "Alarm for changes to network gateways (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-312", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS313MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventName = CreateRoute) || ($.eventName = CreateRouteTable) || ($.eventName = ReplaceRoute) || ($.eventName = ReplaceRouteTableAssociation) || ($.eventName = DeleteRouteTable) || ($.eventName = DeleteRoute) || ($.eventName = DisassociateRouteTable)}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-313", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS313CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-313", "alarm" ] },
+        "AlarmDescription" : "Alarm for route table changes (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-313", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    },
+
+    "CIS314MetricFilter" : {
+      "Type" : "AWS::Logs::MetricFilter",
+      "DependsOn" : [ "TrailLogGroup" ],
+      "Properties" : {
+        "FilterPattern" : "{($.eventName = CreateVpc) || ($.eventName = DeleteVpc) || ($.eventName = ModifyVpcAttribute) || ($.eventName = AcceptVpcPeeringConnection) || ($.eventName = CreateVpcPeeringConnection) || ($.eventName = DeleteVpcPeeringConnection) || ($.eventName = RejectVpcPeeringConnection) || ($.eventName = AttachClassicLinkVpc) || ($.eventName = DetachClassicLinkVpc) || ($.eventName = DisableVpcClassicLink) || ($.eventName = EnableVpcClassicLink)}",
+        "LogGroupName" : { "Ref" : "TrailLogGroup" },
+        "MetricTransformations" : [
+          {
+            "MetricValue" : 1,
+            "MetricNamespace" : "CISBenchmark",
+            "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-314", "metric" ] }
+          }
+        ]
+      }
+    },
+    "CIS314CloudWatchAlarm" : {
+      "Type" : "AWS::CloudWatch::Alarm",
+      "DependsOn" : [ "AlarmTopic" ],
+      "Properties" : {
+        "AlarmName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-314", "alarm" ] },
+        "AlarmDescription" : "Alarm for VPC changes (Scored)",
+        "AlarmActions" : [ { "Ref" : "AlarmTopic" } ],
+        "MetricName" : { "Fn::FindInMap" : [ "FilterAlarmNames", "CIS-314", "metric" ] },
+        "Namespace" : "CISBenchmark",
+        "ComparisonOperator" : "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods" : 1,
+        "Period" : 300,
+        "Statistic" : "Sum",
+        "Threshold" : 1
+      }
+    }
+
+  },
+
+  "Outputs" : {
+
+    "TrailBucket" : {
+      "Description" : "S3 CloudTrail Bucket",
+      "Value" : { "Ref" : "CloudTrailS3Bucket" }
+    },
+    "TrailName" : {
+      "Description" : "CloudTrail Trail Name",
+      "Value" : { "Ref" : "Trail" }
+    }
+  }
+}
