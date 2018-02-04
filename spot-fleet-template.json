@@ -1,0 +1,359 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Spot Fleet template.",
+
+  "Metadata" : {
+    "AWS::CloudFormation::Interface" : {
+    "ParameterGroups" : [
+      {
+        "Label" : { "default" : "Spot Fleet Config" },
+        "Parameters" : [ "Image", "KeyPair", "SecurityGroup", "AllocationStrategy" ]
+      },
+      {
+        "Label" : { "default" : "Network Config" },
+        "Parameters" : [ "Subnet1", "Subnet2" ]
+      }
+    ],
+    "ParameterLabels" : {
+        "Image" : { "default" : "EC2 Image AMI" },
+        "KeyPair" : { "default" : "EC2 Key pair" },
+        "SecurityGroup" : { "default" : "EC2 Security group" },
+        "AllocationStrategy" : { "default" : "EC2 Spot allocation" },
+        "Subnet1" : { "default" : "VPC Subnet1" },
+        "Subnet2" : { "default" : "VPC Subnet2" }
+      }
+    }
+  },
+
+  "Parameters" : {
+
+    "Image" : {
+      "Type" : "String",
+      "Default" : "ami-bf4193c7",
+      "Description" : "Spot Fleet AMI Id."
+    },
+    "KeyPair" : {
+      "Type" : "AWS::EC2::KeyPair::KeyName",
+      "Description" : "Spot Fleet Key pair name."
+    },
+    "SecurityGroup" : {
+      "Type" : "List<AWS::EC2::SecurityGroup::Id>",
+      "Description" : "Spot Fleet Security group(s)."
+    },
+    "AllocationStrategy" : {
+      "Type" : "String",
+      "Default" : "diversified",
+      "AllowedValues" : [ "diversified", "lowerPrice" ],
+      "Description" : "Spot instance allocation strategy."
+    },
+    "Subnet1" : {
+      "Type" : "AWS::EC2::Subnet::Id",
+      "Description" : "First VPC Subnet Id."
+    },
+    "Subnet2" : {
+      "Type" : "AWS::EC2::Subnet::Id",
+      "Description" : "Second VPC Subnet Id."
+    }
+  },
+
+  "Resources" : {
+
+    "SpotFleetRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{ "Effect": "Allow", "Principal": { "Service": ["spotfleet.amazonaws.com"] }, "Action": "sts:AssumeRole" }]
+        },
+        "ManagedPolicyArns": ["arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole"],
+        "Path": "/"
+      }
+    },
+    "SpotFleetASRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{ "Effect": "Allow", "Principal": { "Service": ["application-autoscaling.amazonaws.com"] }, "Action": "sts:AssumeRole" }]
+        },
+        "ManagedPolicyArns": ["arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetAutoscaleRole"],
+        "Path": "/"
+      }
+    },
+
+    "SpotFleet": {
+      "Type": "AWS::EC2::SpotFleet",
+      "DependsOn" : ["SpotFleetRole"],
+      "Properties": {
+        "SpotFleetRequestConfigData": {
+          "IamFleetRole": { "Fn::GetAtt": ["SpotFleetRole", "Arn"] },
+          "AllocationStrategy": { "Ref": "AllocationStrategy" },
+          "TargetCapacity": 16,
+          "SpotPrice": "0.8",
+          "TerminateInstancesWithExpiration": true,
+          "LaunchSpecifications": [
+            {
+              "ImageId": { "Ref": "Image" },
+              "InstanceType": "m4.xlarge",
+              "KeyName": { "Ref": "KeyPair" },
+              "SpotPrice": "0.2",
+              "WeightedCapacity": "2",
+              "Monitoring": {
+                "Enabled": true
+              },
+              "BlockDeviceMappings": [
+                {
+                  "DeviceName": "/dev/xvda",
+                  "Ebs": {
+                    "DeleteOnTermination": true,
+                    "VolumeType": "gp2",
+                    "VolumeSize": 8
+                  }
+                }
+              ],
+              "NetworkInterfaces": [
+                {
+                  "DeviceIndex": 0,
+                  "SubnetId": { "Ref": "Subnet1" },
+                  "DeleteOnTermination": true,
+                  "Groups": { "Ref": "SecurityGroup" }, 
+                  "AssociatePublicIpAddress": false
+                }
+              ]
+            },
+            {
+              "ImageId": { "Ref": "Image" },
+              "InstanceType": "m4.xlarge",
+              "KeyName": { "Ref": "KeyPair" },
+              "SpotPrice": "0.2",
+              "WeightedCapacity": "2",
+              "Monitoring": {
+                "Enabled": true
+              },
+              "BlockDeviceMappings": [
+                {
+                  "DeviceName": "/dev/xvda",
+                  "Ebs": {
+                    "DeleteOnTermination": true,
+                    "VolumeType": "gp2",
+                    "VolumeSize": 8
+                  }
+                }
+              ],
+              "NetworkInterfaces": [
+                {
+                  "DeviceIndex": 0,
+                  "SubnetId": { "Ref": "Subnet2" },
+                  "DeleteOnTermination": true,
+                  "Groups": { "Ref": "SecurityGroup" }, 
+                  "AssociatePublicIpAddress": false
+                }
+              ]
+            },
+            {
+              "ImageId": { "Ref": "Image" },
+              "InstanceType": "m4.2xlarge",
+              "KeyName": { "Ref": "KeyPair" },
+              "SpotPrice": "0.4",
+              "WeightedCapacity": "4",
+              "Monitoring": {
+                "Enabled": true
+              },
+              "BlockDeviceMappings": [
+                {
+                  "DeviceName": "/dev/xvda",
+                  "Ebs": {
+                    "DeleteOnTermination": true,
+                    "VolumeType": "gp2",
+                    "VolumeSize": 8
+                  }
+                }
+              ],
+              "NetworkInterfaces": [
+                {
+                  "DeviceIndex": 0,
+                  "SubnetId": { "Ref": "Subnet1" },
+                  "DeleteOnTermination": true,
+                  "Groups": { "Ref": "SecurityGroup" }, 
+                  "AssociatePublicIpAddress": false
+                }
+              ]
+            },
+            {
+              "ImageId": { "Ref": "Image" },
+              "InstanceType": "m4.2xlarge",
+              "KeyName": { "Ref": "KeyPair" },
+              "SpotPrice": "0.4",
+              "WeightedCapacity": "4",
+              "Monitoring": {
+                "Enabled": true
+              },
+              "BlockDeviceMappings": [
+                {
+                  "DeviceName": "/dev/xvda",
+                  "Ebs": {
+                    "DeleteOnTermination": true,
+                    "VolumeType": "gp2",
+                    "VolumeSize": 8
+                  }
+                }
+              ],
+              "NetworkInterfaces": [
+                {
+                  "DeviceIndex": 0,
+                  "SubnetId": { "Ref": "Subnet2" },
+                  "DeleteOnTermination": true,
+                  "Groups": { "Ref": "SecurityGroup" }, 
+                  "AssociatePublicIpAddress": false
+                }
+              ]
+            },
+            {
+              "ImageId": { "Ref": "Image" },
+              "InstanceType": "m4.4xlarge",
+              "KeyName": { "Ref": "KeyPair" },
+              "SpotPrice": "0.8",
+              "WeightedCapacity": "8",
+              "Monitoring": {
+                "Enabled": true
+              },
+              "BlockDeviceMappings": [
+                {
+                  "DeviceName": "/dev/xvda",
+                  "Ebs": {
+                    "DeleteOnTermination": true,
+                    "VolumeType": "gp2",
+                    "VolumeSize": 8
+                  }
+                }
+              ],
+              "NetworkInterfaces": [
+                {
+                  "DeviceIndex": 0,
+                  "SubnetId": { "Ref": "Subnet1" },
+                  "DeleteOnTermination": true,
+                  "Groups": { "Ref": "SecurityGroup" }, 
+                  "AssociatePublicIpAddress": false
+                }
+              ]
+            },
+            {
+              "ImageId": { "Ref": "Image" },
+              "InstanceType": "m4.4xlarge",
+              "KeyName": { "Ref": "KeyPair" },
+              "SpotPrice": "0.8",
+              "WeightedCapacity": "8",
+              "Monitoring": {
+                "Enabled": true
+              },
+              "BlockDeviceMappings": [
+                {
+                  "DeviceName": "/dev/xvda",
+                  "Ebs": {
+                    "DeleteOnTermination": true,
+                    "VolumeType": "gp2",
+                    "VolumeSize": 8
+                  }
+                }
+              ],
+              "NetworkInterfaces": [
+                {
+                  "DeviceIndex": 0,
+                  "SubnetId": { "Ref": "Subnet2" },
+                  "DeleteOnTermination": true,
+                  "Groups": { "Ref": "SecurityGroup" }, 
+                  "AssociatePublicIpAddress": false
+                }
+              ]
+            }
+          ],
+          "Type": "maintain",
+          "ReplaceUnhealthyInstances": true
+        }
+      }
+    },
+
+    "SpotFleetTarget": {
+      "Type" : "AWS::ApplicationAutoScaling::ScalableTarget",
+      "DependsOn" : ["SpotFleetASRole", "SpotFleet"],
+      "Properties" : {
+        "MaxCapacity" : 32,
+        "MinCapacity" : 4,
+        "ResourceId" : { "Fn::Join" : [ "", [ "spot-fleet-request/", { "Ref" : "SpotFleet" } ]] },
+        "RoleARN" : { "Fn::GetAtt": ["SpotFleetASRole", "Arn"] },
+        "ScalableDimension" : "ec2:spot-fleet-request:TargetCapacity",
+        "ServiceNamespace" : "ec2"
+      }
+    },
+
+    "SpotFleetPolicyUP" : {
+      "Type" : "AWS::ApplicationAutoScaling::ScalingPolicy",
+      "DependsOn" : ["SpotFleetTarget"],
+      "Properties" : {
+      "PolicyName" : "SpotFleetPolicyUP",
+      "PolicyType" : "StepScaling",
+      "ScalingTargetId" : {"Ref": "SpotFleetTarget"},
+      "StepScalingPolicyConfiguration" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "Cooldown" : 60,
+        "MetricAggregationType" : "Average",
+        "StepAdjustments" : [{
+          "MetricIntervalLowerBound" : 0,
+          "ScalingAdjustment" : 4,
+          }]
+        }
+      }
+    },
+    "SpotFleetPolicyDOWN" : {
+      "Type" : "AWS::ApplicationAutoScaling::ScalingPolicy",
+      "DependsOn" : ["SpotFleetTarget"],
+      "Properties" : {
+      "PolicyName" : "SpotFleetPolicyDOWN",
+      "PolicyType" : "StepScaling",
+      "ScalingTargetId" : {"Ref": "SpotFleetTarget"},
+      "StepScalingPolicyConfiguration" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "Cooldown" : 60,
+        "MetricAggregationType" : "Average",
+        "StepAdjustments" : [{
+          "MetricIntervalUpperBound" : 0,
+          "ScalingAdjustment" : -4,
+          }]
+        }
+      }
+    },
+
+    "SpotAlarmHigh": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "DependsOn" : ["SpotFleetPolicyUP", "SpotFleet"],
+      "Properties": {
+        "AlarmDescription": "SpotFleet scale up",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2Spot",
+        "Statistic": "Average",
+        "Period": "120",
+        "EvaluationPeriods": "2",
+        "Threshold": "70",
+        "AlarmActions": [{ "Ref": "SpotFleetPolicyUP" }],
+        "Dimensions": [{ "Name": "FleetRequestId", "Value": { "Ref": "SpotFleet" } }],
+        "ComparisonOperator": "GreaterThanThreshold"
+      }
+    },
+    "SpotAlarmLow": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "DependsOn" : ["SpotFleetPolicyDOWN", "SpotFleet"],
+      "Properties": {
+        "AlarmDescription": "SpotFleet scale down",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2Spot",
+        "Statistic": "Average",
+        "Period": "120",
+        "EvaluationPeriods": "2",
+        "Threshold": "30",
+        "AlarmActions": [{ "Ref": "SpotFleetPolicyDOWN" }],
+        "Dimensions": [{ "Name": "FleetRequestId", "Value": { "Ref": "SpotFleet" } }],
+        "ComparisonOperator": "LessThanThreshold"
+      }
+    }
+  }
+}
